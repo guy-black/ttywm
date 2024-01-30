@@ -1,0 +1,25 @@
+-- Render a desktop
+  - render a pattern wallpaper
+  - render a top bar with basic useful info
+-- open and manage windows
+  - open a window with alt+enter
+  - move selected window with ctrl+arrows
+  - resize selected widown with alt+arrows
+  - close selected window with alt+q
+  - cycle through widows with tab
+    - tab to move first window to the back
+    - shifttab to move last window to the front
+-- implement workspace bitmapped
+  - use bit map idea from river
+  - if shown ws is 00000000 then just don't show any windows
+  - if a window is set to 00000000 the completely hide it until it is changed
+-- make all the windows work as terminals
+  - golang.org/x/term ???
+-- implement small qol fun
+  - "wallpaper" selector and creator
+    - shows all "wallpapers" loaded by default
+    - editor to create a new wallpaper
+    - generate code to add to the config to have the wallpaper available on load
+  - color picker for everything
+  - list all open windows and their ws flags
+    - edit ws flags from here
