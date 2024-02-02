@@ -1,6 +1,3 @@
--- Render a desktop
-  - render a pattern wallpaper
-  - render a top bar with basic useful info
 -- open and manage windows
   - open a window with alt+enter
   - move selected window with ctrl+arrows
@@ -15,6 +12,12 @@
   - if a window is set to 00000000 the completely hide it until it is changed
 -- make all the windows work as terminals
   - golang.org/x/term ???
+  - okay so the NewTerminal function takes a ReaderWriter and a string for prompt
+    - but other functions hint at a file description
+    - and everything is a file, including terminals
+    - and there is already a reader writer for files
+    - so I think I'm supposed to get a fd for a terminal
+    - set it into raw mode, and the pass it's readerwriter to newTerminal
 -- implement small qol fun
   - "wallpaper" selector and creator
     - shows all "wallpapers" loaded by default
@@ -23,3 +26,6 @@
   - color picker for everything
   - list all open windows and their ws flags
     - edit ws flags from here
+  - allow for border on bgs
+  - add more bgs
+    - https://www.asciiart.eu/art-and-design/patterns

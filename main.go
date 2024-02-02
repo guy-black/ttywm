@@ -3,7 +3,8 @@ package main
 import (
 	"fmt"
 	"os"
-	// "time"
+	"os/exec"
+	"time"
 	"strings"
 	// "slices"
 
@@ -18,8 +19,9 @@ type model struct {
 	visWS   byte
 	width   int
 	height  int
-	bg      string
+	bg      int
 	ready   bool
+	dt      time.Time
 }
 
 type window struct {
@@ -36,11 +38,11 @@ func initialModel() model {
 		windows: make([]window, 0),
 		active : 0,
 		visWS  : 0,
-		bg     : "/|/ \\|\\ ",
+		bg     : 0,
+		dt     : time.Now(),
 	}
 }
 
-/*
 type TickMsg time.Time
 
 func doTick() tea.Cmd {
@@ -48,18 +50,20 @@ func doTick() tea.Cmd {
 		return TickMsg(t)
 	})
 }
-*/
 
 func (m model) Init() tea.Cmd {
 	return tea.Sequence(
 		tea.EnterAltScreen,
 		tea.SetWindowTitle("ttywm"),
-		// doTick(),
+		doTick(),
 	)
 }
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
+		case TickMsg:
+			m.dt = time.Now()
+			return m, doTick()
 		case tea.WindowSizeMsg:
 			m.width = msg.Width
 			m.height = msg.Height
@@ -71,6 +75,13 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			switch msg.String() {
 				case "alt+esc":
 					return m, tea.Quit
+				case "alt+b":
+					if m.bg == len(allBGs) - 1 {
+						m.bg = 0
+					} else {
+						m.bg++
+					}
+					return m, nil
 			}
 	}
 	return m, nil
@@ -80,17 +91,38 @@ func (m model) View() string {
 	if !m.ready {
 		return "still loading"
 	}
-	finStrs := []string{}
-	for len(finStrs) < m.height {
-		str := strings.Repeat(m.bg, m.width/len(m.bg)) + m.bg[0:m.width%len(m.bg)]
-		finStrs = append(finStrs, str)
+	// first fill in bg
+	finStrs := fillBG(m)
+	// next add the info bars
+	for k, v := range barFns {
+		if k >= 0 && k < len(finStrs) {
+			finStrs[k] = v(m, finStrs[k])
+		}
+		if k < 0 && k + len(finStrs) >= 0 {
+			finStrs[k + len(finStrs)] = v(m, finStrs[k + len(finStrs)])
+		}
 	}
-	wd := fmt.Sprint (m.width, " x ", m.height)
-	finStrs[0] = wd + finStrs[0][len(wd):]
 	return strings.Join(finStrs, "\n")
 }
 
+func fillBG(m model) []string {
+	finStrs := make([] string, 0)
+	fulStrs := make([] string, 0)
+	// first stretch all lines to the m.width
+	for _, str := range allBGs[m.bg] {
+		fulStrs = append(fulStrs, strings.Repeat(str, m.width/len(str)) + str[0:m.width%len(str)])
+	}// append the lines until less than one more set can fit
+	// TODO, figure out why: for i:=2; i*len(allBGs[m.bg])<=m.height; i++ started eating ram like crazy
 
+	for len(append(finStrs, fulStrs...)) <= m.height {
+		finStrs = append(finStrs, fulStrs...)
+	}
+	// append enought of the lines to fill the bottom of the screen
+	if len(finStrs) < m.height {
+		finStrs = append(finStrs, finStrs[0:m.height%len(allBGs[m.bg])]...)
+	}
+	return finStrs
+}
 
 func main() {
     p := tea.NewProgram(initialModel())
@@ -98,4 +130,71 @@ func main() {
         fmt.Printf("Alas, there's been an error: %v", err)
         os.Exit(1)
     }
+}
+
+var allBGs = [][]string {
+	{
+		"/|/ \\|\\ ",
+	},
+	{
+		"_|__",
+		"___|",
+	},
+	{
+		" / __ \\ \\__/",
+		"/ /  \\ \\____",
+		"\\ \\__/ / __ ",
+		" \\____/ /  \\",
+	},
+}
+
+var barFns = map[int]func(model, string) string {
+	0:
+		func (m model, s string) string {
+			wd := fmt.Sprint (
+				"screen: ", m.width, " x ", m.height,
+			)
+			wd += s[len(wd):]
+			hour, min, sec := m.dt.Clock()
+			hms := stringTime (hour, min, sec)
+			// making two changes to wd means hms could overwrite wd
+			// but also avoids crash if total length is too long
+			wd = wd[:len(wd)-len(hms)] + hms
+			return wd
+		},
+	-1:
+			func (_ model, s string) string {
+				fin := ""
+				cmd := exec.Command("uptime", "-p")
+				var out strings.Builder
+				cmd.Stdout = &out
+				err := cmd.Run()
+				if err != nil {
+					fin = "ext commnd failed"
+				} else {
+					fin = strings.TrimSpace(out.String())
+				}
+				fin += s[len(fin):]
+				return fin
+			},
+}
+
+func stringTime (hour, min, sec int) string {
+	var h,m,s string
+	if hour<10 {
+		h = fmt.Sprintf ("0%d", hour)
+	} else {
+		h = fmt.Sprint (hour)
+	}
+	if min<10 {
+		m = fmt.Sprintf ("0%d", min)
+	} else {
+		m = fmt.Sprint (min)
+	}
+	if sec<10 {
+		s = fmt.Sprintf ("0%d", sec)
+	} else {
+		s = fmt.Sprint (sec)
+	}
+	return fmt.Sprint(h,":",m,":",s)
 }
