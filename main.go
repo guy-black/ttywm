@@ -26,16 +26,28 @@ type model struct {
 
 type window struct {
 	id    int
+	name  string
+	cont  [] string
 	onWS  byte
-	top   int
-	bot   int
-	left  int
-	right int
+	top   int // index of first line
+	lines int // how many lines to take
+	left  int // index of leftmost char
+	cols  int // length of lines
 }
 
 func initialModel() model {
+	w := window {
+		id    : 0,
+		name  : "test window",
+		cont  : make([]string, 0),
+		onWS  : 0,
+		top   : 5,
+		lines : 10,
+		left  : 5,
+		cols  : 20,
+	}
 	return model {
-		windows: make([]window, 0),
+		windows: []window {w},
 		active : 0,
 		visWS  : 0,
 		bg     : 0,
@@ -102,6 +114,11 @@ func (m model) View() string {
 			finStrs[k + len(finStrs)] = v(m, finStrs[k + len(finStrs)])
 		}
 	}
+	// draw windows
+	for _, w := range m.windows {
+	finStrs = drawWin(finStrs, w)
+	}
+	// return the final product
 	return strings.Join(finStrs, "\n")
 }
 
@@ -124,6 +141,28 @@ func fillBG(m model) []string {
 	return finStrs
 }
 
+func drawWin (strs []string, w window) []string {
+	for i, v := range strs {
+		if i >= w.top && i <= w.top - 1 + w.lines {
+			nstr:=""
+			for ii, _ := range v {
+				if ii >= w.left && ii <= w.left - 1 + w.cols {
+					nstr+=" "
+				} else {
+					nstr+=fmt.Sprintf("%c", v[ii])
+				}
+			}
+			strs[i]=nstr
+		}
+	}
+	return strs
+}
+
+
+// ~~~~~
+// main
+// ~~~~~
+
 func main() {
     p := tea.NewProgram(initialModel())
     if _, err := p.Run(); err != nil {
@@ -131,6 +170,10 @@ func main() {
         os.Exit(1)
     }
 }
+
+// ~~~~~~~~~~~
+// config vars
+//~~~~~~~~~~~~
 
 var allBGs = [][]string {
 	{
