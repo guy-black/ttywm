@@ -10,8 +10,12 @@ import (
 
 	// "github.com/charmbracelet/lipgloss"
 	tea "github.com/charmbracelet/bubbletea"
-	// "github.com/charmbracelet/bubbles/textinput"
+`	// "github.com/charmbracelet/bubbles/textinput"
 )
+
+// ~~~~~~~~~~
+// datatypes
+// ~~~~~~~~~~
 
 type model struct {
 	windows []window
@@ -34,6 +38,10 @@ type window struct {
 	left  int // index of leftmost char
 	cols  int // length of lines
 }
+
+// ~~~~~~~~~~~~~~
+// initial setup
+// ~~~~~~~~~~~~~~
 
 func initialModel() model {
 	w := window {
@@ -71,6 +79,10 @@ func (m model) Init() tea.Cmd {
 	)
 }
 
+// ~~~~~~~
+// update
+// ~~~~~~~
+
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 		case TickMsg:
@@ -98,6 +110,12 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 	return m, nil
 }
+
+
+
+// ~~~~~
+// view
+// ~~~~~
 
 func (m model) View() string {
 	if !m.ready {
@@ -158,7 +176,6 @@ func drawWin (strs []string, w window) []string {
 	return strs
 }
 
-
 // ~~~~~
 // main
 // ~~~~~
@@ -171,9 +188,9 @@ func main() {
     }
 }
 
-// ~~~~~~~~~~~
+// ~~~~~~~~~~~~
 // config vars
-//~~~~~~~~~~~~
+//~~~~~~~~~~~~~
 
 var allBGs = [][]string {
 	{
