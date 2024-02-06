@@ -10,7 +10,7 @@ import (
 
 	// "github.com/charmbracelet/lipgloss"
 	tea "github.com/charmbracelet/bubbletea"
-`	// "github.com/charmbracelet/bubbles/textinput"
+	// "github.com/charmbracelet/bubbles/textinput"
 )
 
 // ~~~~~~~~~~
