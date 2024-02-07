@@ -19,6 +19,7 @@ import (
 
 type model struct {
 	windows []window
+	winCt   uint
 	active  int
 	visWS   byte
 	width   int
@@ -31,7 +32,7 @@ type model struct {
 }
 
 type window struct {
-	id    int
+	id    uint
 	name  string
 	cont  [] string
 	onWS  byte
@@ -46,18 +47,9 @@ type window struct {
 // ~~~~~~~~~~~~~~
 
 func initialModel() model {
-	w := window {
-		id    : 0,
-		name  : "test window",
-		cont  : make([]string, 0),
-		onWS  : 0,
-		top   : 5,
-		lines : 10,
-		left  : 5,
-		cols  : 20,
-	}
 	return model {
-		windows: []window {w},
+		windows: []window {},
+		winCt  : 0,
 		active : 0,
 		visWS  : 0,
 		bg     : 0,
@@ -111,6 +103,18 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					}
 					return m, nil
 				case "alt+enter":
+					newWin :=
+						window {
+							id    : m.winCt,
+							name  : "",
+							cont  : make([]string, 0),
+							onWS  : 0,
+							top   : m.currY,
+							lines : 10,
+							left  : m.currX,
+							cols  : 20,
+						}
+					m.windows = append(m.windows, newWin)
 					return m, nil
 				case "alt+w": // cursor up
 					if m.currY > 0 {
@@ -200,16 +204,11 @@ func fillBG(m model) []string {
 
 func drawWin (strs []string, w window) []string {
 	for i, v := range strs {
-		if i >= w.top && i <= w.top - 1 + w.lines {
-			nstr:=""
-			for ii, _ := range v {
-				if ii >= w.left && ii <= w.left - 1 + w.cols {
-					nstr+=" "
-				} else {
-					nstr+=fmt.Sprintf("%c", v[ii])
-				}
-			}
-			strs[i]=nstr
+		if i == w.top || i == w.top - 1 + w.lines {
+			strs[i] = v[:w.left] + "+" + strings.Repeat("-", w.cols-2) + "+" + v[w.left + w.cols:]
+		}
+		if i > w.top && i < w.top - 1 + w.lines {
+			strs[i] = v[:w.left] + "|" + strings.Repeat(" ", w.cols-2) + "|" + v[w.left + w.cols:]
 		}
 	}
 	return strs
