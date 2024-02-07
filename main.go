@@ -26,6 +26,8 @@ type model struct {
 	bg      int
 	ready   bool
 	dt      time.Time
+	currX    int
+	currY    int
 }
 
 type window struct {
@@ -91,6 +93,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case tea.WindowSizeMsg:
 			m.width = msg.Width
 			m.height = msg.Height
+			m.currX = m.width/2
+			m.currY = m.height/2
 			if !m.ready {
 				m.ready = true
 			}
@@ -106,12 +110,33 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						m.bg++
 					}
 					return m, nil
+				case "alt+enter":
+					return m, nil
+				case "alt+w": // cursor up
+					if m.currY > 0 {
+						m.currY--
+					}
+					return m, nil
+				case "alt+s": // cursor down
+					if m.currY < m.height - 1 {
+						m.currY++
+					}
+					return m, nil
+				case "alt+a": // cursor left
+					if m.currX > 0 {
+						m.currX--
+					}
+					return m, nil
+				case "alt+d": // cursor right
+					if m.currX < m.width - 1 {
+						m.currX++
+					}
+					return m, nil
+
 			}
 	}
 	return m, nil
 }
-
-
 
 // ~~~~~
 // view
@@ -135,6 +160,20 @@ func (m model) View() string {
 	// draw windows
 	for _, w := range m.windows {
 	finStrs = drawWin(finStrs, w)
+	}
+	// lastly draw the cursor on top
+	for k, v := range finStrs {
+		if k == m.currY {
+			nstr := ""
+			for i, r := range v {
+				if i == m.currX {
+					nstr += "🠭"
+				} else {
+					nstr += fmt.Sprintf("%c", r)
+				}
+			}
+			finStrs[k] = nstr
+		}
 	}
 	// return the final product
 	return strings.Join(finStrs, "\n")
@@ -222,21 +261,27 @@ var barFns = map[int]func(model, string) string {
 			wd = wd[:len(wd)-len(hms)] + hms
 			return wd
 		},
+	1:
+		func (m model, s string) string {
+			coords := fmt.Sprint("cursor x: ", m.currX, " y: ", m.currY)
+			fin := coords + s[len(coords):]
+			return fin
+		},
 	-1:
-			func (_ model, s string) string {
-				fin := ""
-				cmd := exec.Command("uptime", "-p")
-				var out strings.Builder
-				cmd.Stdout = &out
-				err := cmd.Run()
-				if err != nil {
-					fin = "ext commnd failed"
-				} else {
-					fin = strings.TrimSpace(out.String())
-				}
-				fin += s[len(fin):]
-				return fin
-			},
+		func (_ model, s string) string {
+			fin := ""
+			cmd := exec.Command("uptime", "-p")
+			var out strings.Builder
+			cmd.Stdout = &out
+			err := cmd.Run()
+			if err != nil {
+				fin = "ext commnd failed"
+			} else {
+				fin = strings.TrimSpace(out.String())
+			}
+			fin += s[len(fin):]
+			return fin
+		},
 }
 
 func stringTime (hour, min, sec int) string {
