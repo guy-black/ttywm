@@ -1,15 +1,15 @@
--- open and manage windows
-  - open a window with alt+enter
-  - move selected window with ctrl+arrows
-  - resize selected widown with alt+arrows
-  - close selected window with alt+q
-  - cycle through widows with tab
-    - tab to move first window to the back
-    - shifttab to move last window to the front
 -- implement workspace bitmapped
   - use bit map idea from river
   - if shown ws is 00000000 then just don't show any windows
   - if a window is set to 00000000 the completely hide it until it is changed
+-- implement alt+tab window switcher
+  - pop up modal shows all windows
+  - able to change ws on the currently seleected window with alt+1-8
+  - able to move it to top of the stack and move cursor to be over the window
+    - will need to work out how to handle bringing it into visible workspace
+    -- ie if the window is on 01001000 but my ws is 00000111:
+      should I change my workspace to 01000111, or to 00001111 or even 01001111 or
+      should I change the windwo to 01001001 or 01001010 or 01001100 or 0100111 or what???
 -- make all the windows work as terminals
   - golang.org/x/term ???
   - okay so the NewTerminal function takes a ReaderWriter and a string for prompt
