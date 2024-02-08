@@ -69,7 +69,7 @@ func initialModel() model {
 		windows: []window {},
 		winCt  : 0,
 		active : 0,
-		visWS  : 0,
+		visWS  : 0b10000000,
 		bg     : 0,
 		dt     : time.Now(),
 		action : cursor,
@@ -127,7 +127,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 							id    : m.winCt,
 							name  : "",
 							cont  : make([]string, 0),
-							onWS  : 0,
+							onWS  : m.visWS,
 							top   : m.currY,
 							lines : 10,
 							left  : m.currX,
@@ -155,7 +155,6 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						m.windows = new
 					}
 					return m, nil
-
 				case "alt+w": // cursor up
 					switch m.action {
 						case cursor:
@@ -299,7 +298,7 @@ func (m model) View() string {
 	}
 	// draw windows
 	for _, w := range m.windows {
-	finStrs = drawWin(finStrs, w)
+		finStrs = drawWin(finStrs, w)
 	}
 	// lastly draw the cursor on top
 	for k, v := range finStrs {
