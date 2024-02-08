@@ -51,6 +51,15 @@ const (
 	resize
 )
 
+func strAct (a action) string {
+	switch a {
+		case cursor: return "cursor"
+		case move:   return "move"
+		case resize: return "resize"
+	}
+	return ""
+}
+
 // ~~~~~~~~~~~~~~
 // initial setup
 // ~~~~~~~~~~~~~~
@@ -219,14 +228,18 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					if m.action == move {
 						m.action = cursor
 					} else {
-						m.action = move
+						if getCurWinInd (m.windows, m.currX, m.currY) >= 0 {
+							m.action = move
+						}
 					}
 					return m, nil
 				case "alt+r": // go to resize mode
 					if m.action == resize {
 						m.action = cursor
 					} else {
-						m.action = resize
+						if getCurWinInd (m.windows, m.currX, m.currY) >= 0 {
+							m.action = resize
+						}
 					}
 					return m, nil
 			}
@@ -373,8 +386,8 @@ var barFns = map[int]func(model, string) string {
 		},
 	1:
 		func (m model, s string) string {
-			coords := fmt.Sprint("cursor x: ", m.currX, " y: ", m.currY)
-			fin := coords + s[len(coords):]
+			action := fmt.Sprint("action set to: ", strAct(m.action))
+			fin := action + s[len(action):]
 			return fin
 		},
 	-1:
