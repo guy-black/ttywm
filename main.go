@@ -116,6 +116,15 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						}
 					m.windows = append(m.windows, newWin)
 					return m, nil
+				case "alt+z": // lift window to top of stack
+					cw := getCurWinInd (m.windows, m.currX, m.currY)
+					if cw >= 0 && cw < len(m.windows) -1 {
+						// only adjust stack if there is a window under the cursor
+						// and it's not already on top of the stack
+						new := append (m.windows[:cw], append(m.windows[cw+1:], m.windows[cw])...)
+						m.windows = new
+					}
+					return m, nil
 				case "alt+w": // cursor up
 					if m.currY > 0 {
 						m.currY--
@@ -140,6 +149,25 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 	}
 	return m, nil
+}
+
+// get index of window the cursor is currently over
+// return -1 if cursor is not over any window
+func getCurWinInd (ws []window, x, y int) int {
+	index := -1
+	for i, w := range ws {
+		if currWin (x, y, w) {
+			index = i
+		}
+	}
+	return index
+}
+
+func currWin (x, y int, w window) bool {
+	return x >= w.left &&
+		x <= w.left - 1 + w.cols &&
+		y >= w.top &&
+		y <= w.top - 1 + w.lines
 }
 
 // ~~~~~
