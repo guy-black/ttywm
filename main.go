@@ -27,8 +27,9 @@ type model struct {
 	bg      int
 	ready   bool
 	dt      time.Time
-	currX    int
-	currY    int
+	currX   int
+	currY   int
+	action  action
 }
 
 type window struct {
@@ -42,6 +43,14 @@ type window struct {
 	cols  int // length of lines
 }
 
+type action int
+
+const (
+	cursor action = iota
+	move
+	resize
+)
+
 // ~~~~~~~~~~~~~~
 // initial setup
 // ~~~~~~~~~~~~~~
@@ -54,6 +63,7 @@ func initialModel() model {
 		visWS  : 0,
 		bg     : 0,
 		dt     : time.Now(),
+		action : cursor,
 	}
 }
 
@@ -126,26 +136,99 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					}
 					return m, nil
 				case "alt+w": // cursor up
-					if m.currY > 0 {
-						m.currY--
+					switch m.action {
+						case cursor:
+							if m.currY > 0 {
+								m.currY--
+							}
+						case move:
+							cw := getCurWinInd (m.windows, m.currX, m.currY)
+							if m.currY > 0 && cw >= 0 {
+								m.windows[cw].top--
+								m.currY--
+							}
+						case resize:
+							cw := getCurWinInd (m.windows, m.currX, m.currY)
+							if m.currY > 0 && cw >= 0 && m.windows[cw].lines>2 {
+								m.windows[cw].lines--
+								m.currY--
+							}
 					}
 					return m, nil
 				case "alt+s": // cursor down
-					if m.currY < m.height - 1 {
-						m.currY++
+					switch m.action{
+						case cursor:
+							if m.currY < m.height - 1 {
+								m.currY++
+							}
+						case move:
+							cw := getCurWinInd (m.windows, m.currX, m.currY)
+							if m.currY < m.height - 1 && cw >= 0 {
+								m.windows[cw].top++
+								m.currY++
+							}
+						case resize:
+							cw := getCurWinInd (m.windows, m.currX, m.currY)
+							if m.currY < m.height - 1 && cw >= 0 {
+								m.windows[cw].lines++
+								m.currY++
+							}
 					}
 					return m, nil
 				case "alt+a": // cursor left
-					if m.currX > 0 {
-						m.currX--
+					switch m.action{
+						case cursor:
+							if m.currX > 0 {
+								m.currX--
+							}
+						case move:
+							cw := getCurWinInd (m.windows, m.currX, m.currY)
+							if m.currX > 0 && cw >= 0 {
+								m.windows[cw].left--
+								m.currX--
+							}
+						case resize:
+							cw := getCurWinInd (m.windows, m.currX, m.currY)
+							if m.currX > 0 && cw >= 0 && m.windows[cw].cols > 2 {
+								m.windows[cw].cols--
+								m.currX--
+							}
 					}
 					return m, nil
 				case "alt+d": // cursor right
-					if m.currX < m.width - 1 {
-						m.currX++
+					switch m.action{
+						case cursor:
+							if m.currX < m.width - 1 {
+								m.currX++
+							}
+						case move:
+							cw := getCurWinInd (m.windows, m.currX, m.currY)
+							if m.currX < m.width - 1 && cw >= 0 {
+								m.windows[cw].left++
+								m.currX++
+							}
+						case resize:
+							cw := getCurWinInd (m.windows, m.currX, m.currY)
+							if m.currX < m.width - 1 && cw >= 0 {
+								m.windows[cw].cols++
+								m.currX++
+							}
 					}
 					return m, nil
-
+				case "alt+e": // go to move mode
+					if m.action == move {
+						m.action = cursor
+					} else {
+						m.action = move
+					}
+					return m, nil
+				case "alt+r": // go to resize mode
+					if m.action == resize {
+						m.action = cursor
+					} else {
+						m.action = resize
+					}
+					return m, nil
 			}
 	}
 	return m, nil
