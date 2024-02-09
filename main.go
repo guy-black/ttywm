@@ -133,6 +133,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 							left  : m.currX,
 							cols  : 20,
 						}
+					m.winCt++
 					m.windows = append(m.windows, newWin)
 					return m, nil
 				case "alt+z": // lift window to top of stack
@@ -419,6 +420,15 @@ var barFns = map[int]func(model, string) string {
 		func (m model, s string) string {
 			visWS := fmt.Sprintf("visWS: %08b", m.visWS)
 			fin := visWS + s[len(visWS):]
+			curWin := ""
+			curWinInd := getCurWinInd (m.windows, m.currX, m.currY)
+			if curWinInd >= 0 {
+				win := m.windows[curWinInd]
+				curWin = fmt.Sprintf("n:%s|id:%d|on:%08b", win.name, win.id, win.onWS)
+			} else {
+				curWin = "no window selected"
+			}
+			fin = fin[:len(fin)-len(curWin)] + curWin
 			return fin
 		},
 	-1:
