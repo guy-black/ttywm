@@ -146,9 +146,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					return m, nil
 				case "alt+q": // delete window
 					cw := getCurWinInd (m.windows, m.currX, m.currY)
-					if cw >= 0 && cw < len(m.windows) -1 {
+					if cw >= 0 {
 						// only adjust stack if there is a window under the cursor
-						// and it's not already on top of the stack
 						// closeterm(m.windows[cw])
 						// will need to define that when I have actual termnials rendering
 						new := append (m.windows[:cw], m.windows[cw+1:]...)
