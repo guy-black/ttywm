@@ -1,3 +1,4 @@
+-- figure out why it crashes on when a window drifts left or right outside of the visible range
 -- add bar to show current visWS
 -- add bar to show id, name, and onWS of selected window if one is selected
 -- implement alt+c to bring up textInput to change name of window if one is selected

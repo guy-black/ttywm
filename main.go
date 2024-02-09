@@ -340,10 +340,30 @@ func fillBG(m model) []string {
 func drawWin (strs []string, w window) []string {
 	for i, v := range strs {
 		if i == w.top || i == w.top - 1 + w.lines {
-			strs[i] = v[:w.left] + "+" + strings.Repeat("-", w.cols-2) + "+" + v[w.left + w.cols:]
+			nstr := ""
+			for ii, _ := range v {
+				if ii == w.left || ii == w.left + w.cols - 1 {
+					nstr += "+" // TODO: extract into const, termCorner
+				}else if ii > w.left && ii < w.left + w.cols - 1 {
+					nstr += "-" // TODO: extract into const, termTopBotBorder
+				} else {
+					nstr += fmt.Sprintf("%c", v[ii])
+				}
+			}
+			strs[i] = nstr // v[:w.left] + "+" + strings.Repeat("-", w.cols-2) + "+" + v[w.left + w.cols:]
 		}
 		if i > w.top && i < w.top - 1 + w.lines {
-			strs[i] = v[:w.left] + "|" + strings.Repeat(" ", w.cols-2) + "|" + v[w.left + w.cols:]
+			nstr := ""
+			for ii, _ := range v {
+				if ii == w.left || ii == w.left + w.cols - 1 {
+					nstr += "|" // TODO: extract into const, termLftRgtCorner
+				} else if ii > w.left && ii < w.left + w.cols - 1 {
+					nstr += " " // TODO: replace with w.cont
+				} else {
+					nstr += fmt.Sprintf("%c", v[ii])
+				}
+			}
+			strs[i] = nstr // v[:w.left] + "|" + strings.Repeat(" ", w.cols-2) + "|" + v[w.left + w.cols:]
 		}
 	}
 	return strs
@@ -385,7 +405,8 @@ var barFns = map[int]func(model, string) string {
 	0:
 		func (m model, s string) string {
 			wd := fmt.Sprint (
-				"screen: ", m.width, " x ", m.height,
+				"[", m.width, " x ", m.height, "]",
+				"[", strAct(m.action), "]",
 			)
 			wd += s[len(wd):]
 			hour, min, sec := m.dt.Clock()
@@ -397,8 +418,8 @@ var barFns = map[int]func(model, string) string {
 		},
 	1:
 		func (m model, s string) string {
-			action := fmt.Sprint("action set to: ", strAct(m.action))
-			fin := action + s[len(action):]
+			visWS := fmt.Sprintf("visWS: %08b", m.visWS)
+			fin := visWS + s[len(visWS):]
 			return fin
 		},
 	-1:
