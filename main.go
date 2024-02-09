@@ -10,7 +10,7 @@ import (
 
 	// "github.com/charmbracelet/lipgloss"
 	tea "github.com/charmbracelet/bubbletea"
-	// "github.com/charmbracelet/bubbles/textinput"
+	"github.com/charmbracelet/bubbles/textinput"
 )
 
 // ~~~~~~~~~~
@@ -18,25 +18,25 @@ import (
 // ~~~~~~~~~~
 
 type model struct {
-	windows []window
-	winCt   uint
-	active  int
-	visWS   byte
-	width   int
-	height  int
-	bg      int
-	ready   bool
-	dt      time.Time
-	currX   int
-	currY   int
-	action  action
+	windows []window // slice of currently opened windows
+	winCt   uint // total windows that have been opened, used to assign unique ID's to windows
+	visWS   byte // the byte of visible workspaces
+	width   int // the width of the screen
+	height  int // the height of the screen
+	bg      int // which bg to use from global var allBGs
+	ready   bool // whether ttywm is ready to render the screen
+	dt      time.Time // datetime
+	currX   int // cursor x coordinat
+	currY   int // y coord.  should be curX/curY, but currY is tasty
+	action  action // does wask move cursor, move a window, or resize a window
+	gtxtin  textinput.Model // global text input
 }
 
 type window struct {
-	id    uint
-	name  string
-	cont  [] string
-	onWS  byte
+	id    uint // unique id
+	name  string // name
+	cont  [] string // contents
+	onWS  byte // byte of workspaces it's visible on
 	top   int // index of first line
 	lines int // how many lines to take
 	left  int // index of leftmost char
@@ -65,14 +65,17 @@ func strAct (a action) string {
 // ~~~~~~~~~~~~~~
 
 func initialModel() model {
+	ti := textinput.New()
+	ti.Blur()
+	ti.Width = 25
 	return model {
 		windows: []window {},
 		winCt  : 0,
-		active : 0,
 		visWS  : 0b10000000,
 		bg     : 0,
 		dt     : time.Now(),
 		action : cursor,
+		gtxtin : ti,
 	}
 }
 
@@ -253,9 +256,37 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						}
 					}
 					return m, nil
+				case "alt+c": // change name of window
+					winInd := getCurWinInd (m.windows, m.currX, m.currY)
+					if winInd >= 0 && !m.gtxtin.Focused(){
+						// only do this if there is a window selected
+						// and m.textin is not already focused
+						// focus text input
+						tfc := m.gtxtin.Focus()
+						// set it to current name
+						m.gtxtin.SetValue(m.windows[winInd].name)
+						return m, tfc
+					} else {
+						// either theres is no window selected, or textinput is already focused
+						// so just do nothing
+						return m, nil
+					}
+				case "enter": // blur active txtinput
+					if m.gtxtin.Focused() { // check if gtxtin is focused
+						winInd := getCurWinInd (m.windows, m.currX, m.currY)
+						if winInd >= 0 { // if ther is a selected window, set it's name
+							m.windows[winInd].name = m.gtxtin.Value()
+						}
+						// either way also reset and blur gtxtin
+						m.gtxtin.Reset()
+						m.gtxtin.Blur()
+					}
+					return m, nil
 			}
 	}
-	return m, nil
+	var cmd tea.Cmd
+	m.gtxtin, cmd = m.gtxtin.Update(msg)
+	return m, cmd
 }
 
 // get index of window the cursor is currently over
@@ -300,7 +331,7 @@ func (m model) View() string {
 	for _, w := range m.windows {
 		finStrs = drawWin(finStrs, w)
 	}
-	// lastly draw the cursor on top
+	// draw the cursor on top
 	for k, v := range finStrs {
 		if k == m.currY {
 			nstr := ""
@@ -313,6 +344,12 @@ func (m model) View() string {
 			}
 			finStrs[k] = nstr
 		}
+	}
+	// if gtxtin is focused, render it
+	if m.gtxtin.Focused() {
+		ln := 27 // this is m.gtxtin.Width + len(m.gtxtin.Prompt) (default "> " so two)
+		lst := len(finStrs) - 1
+		finStrs[lst] = finStrs[lst][:len(finStrs[lst])-ln] + m.gtxtin.View()
 	}
 	// return the final product
 	return strings.Join(finStrs, "\n")

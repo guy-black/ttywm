@@ -1,4 +1,3 @@
--- implement alt+c to bring up textInput to change name of window if one is selected
 -- implement workspace bitmapped
   - use bit map idea from river
   - if shown ws is 00000000 then just don't show any windows
