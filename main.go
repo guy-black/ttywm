@@ -140,7 +140,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.windows = append(m.windows, newWin)
 					return m, nil
 				case "alt+z": // lift window to top of stack
-					cw := getCurWinInd (m.windows, m.currX, m.currY)
+					cw := getCurWinInd (m)
 					if cw >= 0 && cw < len(m.windows) -1 {
 						// only adjust stack if there is a window under the cursor
 						// and it's not already on top of the stack
@@ -149,7 +149,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					}
 					return m, nil
 				case "alt+q": // delete window
-					cw := getCurWinInd (m.windows, m.currX, m.currY)
+					cw := getCurWinInd (m)
 					if cw >= 0 {
 						// only adjust stack if there is a window under the cursor
 						// closeterm(m.windows[cw])
@@ -165,13 +165,13 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 								m.currY--
 							}
 						case move:
-							cw := getCurWinInd (m.windows, m.currX, m.currY)
+							cw := getCurWinInd (m)
 							if m.currY > 0 && cw >= 0 {
 								m.windows[cw].top--
 								m.currY--
 							}
 						case resize:
-							cw := getCurWinInd (m.windows, m.currX, m.currY)
+							cw := getCurWinInd (m)
 							if m.currY > 0 && cw >= 0 && m.windows[cw].lines>2 {
 								m.windows[cw].lines--
 								m.currY--
@@ -185,13 +185,13 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 								m.currY++
 							}
 						case move:
-							cw := getCurWinInd (m.windows, m.currX, m.currY)
+							cw := getCurWinInd (m)
 							if m.currY < m.height - 1 && cw >= 0 {
 								m.windows[cw].top++
 								m.currY++
 							}
 						case resize:
-							cw := getCurWinInd (m.windows, m.currX, m.currY)
+							cw := getCurWinInd (m)
 							if m.currY < m.height - 1 && cw >= 0 {
 								m.windows[cw].lines++
 								m.currY++
@@ -205,13 +205,13 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 								m.currX--
 							}
 						case move:
-							cw := getCurWinInd (m.windows, m.currX, m.currY)
+							cw := getCurWinInd (m)
 							if m.currX > 0 && cw >= 0 {
 								m.windows[cw].left--
 								m.currX--
 							}
 						case resize:
-							cw := getCurWinInd (m.windows, m.currX, m.currY)
+							cw := getCurWinInd (m)
 							if m.currX > 0 && cw >= 0 && m.windows[cw].cols > 2 {
 								m.windows[cw].cols--
 								m.currX--
@@ -225,13 +225,13 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 								m.currX++
 							}
 						case move:
-							cw := getCurWinInd (m.windows, m.currX, m.currY)
+							cw := getCurWinInd (m)
 							if m.currX < m.width - 1 && cw >= 0 {
 								m.windows[cw].left++
 								m.currX++
 							}
 						case resize:
-							cw := getCurWinInd (m.windows, m.currX, m.currY)
+							cw := getCurWinInd (m)
 							if m.currX < m.width - 1 && cw >= 0 {
 								m.windows[cw].cols++
 								m.currX++
@@ -242,7 +242,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					if m.action == move {
 						m.action = cursor
 					} else {
-						if getCurWinInd (m.windows, m.currX, m.currY) >= 0 {
+						if getCurWinInd (m) >= 0 {
 							m.action = move
 						}
 					}
@@ -251,13 +251,13 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					if m.action == resize {
 						m.action = cursor
 					} else {
-						if getCurWinInd (m.windows, m.currX, m.currY) >= 0 {
+						if getCurWinInd (m) >= 0 {
 							m.action = resize
 						}
 					}
 					return m, nil
 				case "alt+c": // change name of window
-					winInd := getCurWinInd (m.windows, m.currX, m.currY)
+					winInd := getCurWinInd (m)
 					if winInd >= 0 && !m.gtxtin.Focused(){
 						// only do this if there is a window selected
 						// and m.textin is not already focused
@@ -273,13 +273,77 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					}
 				case "enter": // blur active txtinput
 					if m.gtxtin.Focused() { // check if gtxtin is focused
-						winInd := getCurWinInd (m.windows, m.currX, m.currY)
+						winInd := getCurWinInd (m)
 						if winInd >= 0 { // if ther is a selected window, set it's name
 							m.windows[winInd].name = m.gtxtin.Value()
 						}
 						// either way also reset and blur gtxtin
 						m.gtxtin.Reset()
 						m.gtxtin.Blur()
+					}
+					return m, nil
+				case "alt+1": // toggle ws 1
+					winInd := getCurWinInd (m)
+					if winInd >= 0 {
+						m.windows[winInd].onWS = m.windows[winInd].onWS^0b10000000
+					} else {
+						m.visWS = m.visWS^0b10000000
+					}
+					return m, nil
+				case "alt+2": // toggle ws 2
+					winInd := getCurWinInd (m)
+					if winInd >= 0 {
+						m.windows[winInd].onWS = m.windows[winInd].onWS^0b01000000
+					} else {
+						m.visWS = m.visWS^0b01000000
+					}
+					return m, nil
+				case "alt+3": // toggle ws 3
+					winInd := getCurWinInd (m)
+					if winInd >= 0 {
+						m.windows[winInd].onWS = m.windows[winInd].onWS^0b00100000
+					} else {
+						m.visWS = m.visWS^0b00100000
+					}
+					return m, nil
+				case "alt+4": // toggle ws 4
+					winInd := getCurWinInd (m)
+					if winInd >= 0 {
+						m.windows[winInd].onWS = m.windows[winInd].onWS^0b00010000
+					} else {
+						m.visWS = m.visWS^0b00010000
+					}
+					return m, nil
+				case "alt+5": // toggle ws 5
+					winInd := getCurWinInd (m)
+					if winInd >= 0 {
+						m.windows[winInd].onWS = m.windows[winInd].onWS^0b00001000
+					} else {
+						m.visWS = m.visWS^0b00001000
+					}
+					return m, nil
+				case "alt+6": // toggle ws 6
+					winInd := getCurWinInd (m)
+					if winInd >= 0 {
+						m.windows[winInd].onWS = m.windows[winInd].onWS^0b00000100
+					} else {
+						m.visWS = m.visWS^0b00000100
+					}
+					return m, nil
+				case "alt+7": // toggle ws 7
+					winInd := getCurWinInd (m)
+					if winInd >= 0 {
+						m.windows[winInd].onWS = m.windows[winInd].onWS^0b00000010
+					} else {
+						m.visWS = m.visWS^0b00000010
+					}
+					return m, nil
+				case "alt+8": // toggle ws 8
+					winInd := getCurWinInd (m)
+					if winInd >= 0 {
+						m.windows[winInd].onWS = m.windows[winInd].onWS^0b00000001
+					} else {
+						m.visWS = m.visWS^0b00000001
 					}
 					return m, nil
 			}
@@ -291,10 +355,13 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 // get index of window the cursor is currently over
 // return -1 if cursor is not over any window
-func getCurWinInd (ws []window, x, y int) int {
+func getCurWinInd (m model) int {
+	ws := m.windows
+	x := m.currX
+	y := m.currY
 	index := -1
 	for i, w := range ws {
-		if currWin (x, y, w) {
+		if m.visWS&w.onWS > 0 && currWin (x, y, w) {
 			index = i
 		}
 	}
@@ -329,7 +396,9 @@ func (m model) View() string {
 	}
 	// draw windows
 	for _, w := range m.windows {
-		finStrs = drawWin(finStrs, w)
+		if m.visWS&w.onWS > 0 {
+			finStrs = drawWin(finStrs, w)
+		}
 	}
 	// draw the cursor on top
 	for k, v := range finStrs {
@@ -458,7 +527,7 @@ var barFns = map[int]func(model, string) string {
 			visWS := fmt.Sprintf("visWS: %08b", m.visWS)
 			fin := visWS + s[len(visWS):]
 			curWin := ""
-			curWinInd := getCurWinInd (m.windows, m.currX, m.currY)
+			curWinInd := getCurWinInd (m)
 			if curWinInd >= 0 {
 				win := m.windows[curWinInd]
 				curWin = fmt.Sprintf("n:%s|id:%d|on:%08b", win.name, win.id, win.onWS)
