@@ -11,6 +11,7 @@ import (
 	// "github.com/charmbracelet/lipgloss"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/bubbles/textinput"
+	"github.com/creack/pty"
 )
 
 // ~~~~~~~~~~
@@ -41,6 +42,8 @@ type window struct {
 	lines int // how many lines to take
 	left  int // index of leftmost char
 	cols  int // length of lines
+	pty   *os.File // pointer to pty
+	cmd   *exec.Cmd // pointer to the running shell
 }
 
 type action int
@@ -125,6 +128,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					}
 					return m, nil
 				case "alt+enter":
+					c := exec.Command("/bin/sh")
+					ptmx, err := pty.Start(c)
+					if err != nil {
+						return m, nil // TODO: handle this error more gracefully
+					}
 					newWin :=
 						window {
 							id    : m.winCt,
@@ -135,6 +143,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 							lines : 10,
 							left  : m.currX,
 							cols  : 20,
+							pty   : ptmx,
+							cmd   : c,
 						}
 					m.winCt++
 					m.windows = append(m.windows, newWin)
@@ -152,9 +162,13 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					cw := getCurWinInd (m)
 					if cw >= 0 {
 						// only adjust stack if there is a window under the cursor
-						// closeterm(m.windows[cw])
-						// will need to define that when I have actual termnials rendering
-						new := append (m.windows[:cw], m.windows[cw+1:]...)
+						m.windows[cw].pty.Close() // close the pty
+						m.windows[cw].cmd.Process.Wait() // waits to kill the shell
+						m.windows[cw].cmd.Process.Kill() // kill the shell
+						// TODO: learn why I need to Wait() before killing to avoid leaving a zombie process
+						// also why can't I just Release() after Kill() I know if it works then fine
+						// but I wanted to comment a line as // release the zombie that would've been fun :(
+						new := append (m.windows[:cw], m.windows[cw+1:]...) // remove the window
 						m.windows = new
 					}
 					return m, nil

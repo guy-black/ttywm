@@ -15,6 +15,7 @@
     - so I think I'm supposed to get a fd for a terminal
     - set it into raw mode, and the pass it's readerwriter to newTerminal
 -- implement small qol fun
+  - load and save list of windows
   - "wallpaper" selector and creator
     - shows all "wallpapers" loaded by default
     - editor to create a new wallpaper
