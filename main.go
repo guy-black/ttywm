@@ -36,12 +36,12 @@ type model struct {
 type window struct {
 	id    uint // unique id
 	name  string // name
-	cont  [] string // contents
+	cont  [][] rune // contents
 	onWS  byte // byte of workspaces it's visible on
-	top   int // index of first line
-	lines int // how many lines to take
-	left  int // index of leftmost char
-	cols  int // length of lines
+	top   int // index of top border
+	lines int // how many lines to give the window
+	left  int // index of left border
+	cols  int // how many columns to give the whole window
 	pty   *os.File // pointer to pty
 	cmd   *exec.Cmd // pointer to the running shell
 }
@@ -110,10 +110,16 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case tea.WindowSizeMsg:
 			m.width = msg.Width
 			m.height = msg.Height
-			m.currX = m.width/2
-			m.currY = m.height/2
+			if m.currX >= m.width {
+				m.currX = m.width - 1
+			}
+			if m.currY >= m.height {
+				m.currY = m.height - 1
+			}
 			if !m.ready {
 				m.ready = true
+				m.currX = m.width/2
+				m.currY = m.height/2
 			}
 			return m, nil
 		case tea.KeyMsg:
@@ -128,21 +134,35 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					}
 					return m, nil
 				case "alt+enter":
-					c := exec.Command("/bin/sh")
-					ptmx, err := pty.Start(c)
+					wsz := pty.Winsize {
+						Rows : 15, // TODO: pull these numbers from
+						Cols : 65, // default window size consts
+					}
+					c := exec.Command("/bin/bash") // TODO: move this to a const SHELL
+					ptmx, err := pty.StartWithSize(c, &wsz)
 					if err != nil {
 						return m, nil // TODO: handle this error more gracefully
+					}
+					txt := make ([]byte, 1024)
+					ptmx.Read(txt)
+					isNewLine := func(c rune) bool {
+						return c == '\n' || c == '\r'
+					}
+					winContStrs := strings.FieldsFunc(string(txt), isNewLine)
+					winConts := make([][]rune, 0)
+					for _, s := range (winContStrs) {
+						winConts = append (winConts, []rune(s))
 					}
 					newWin :=
 						window {
 							id    : m.winCt,
 							name  : "",
-							cont  : make([]string, 0),
+							cont  : winConts,
 							onWS  : m.visWS,
 							top   : m.currY,
-							lines : 10,
+							lines : 15, // TODO: pull this into a const DEFUALT_WINDOW_HEIGHT
 							left  : m.currX,
-							cols  : 20,
+							cols  : 65, // TODO: pull this into a const DEFUALT_WINDOW_WIDTH
 							pty   : ptmx,
 							cmd   : c,
 						}
@@ -420,7 +440,7 @@ func (m model) View() string {
 			nstr := ""
 			for i, r := range v {
 				if i == m.currX {
-					nstr += "🠭"
+					nstr += "🠭" // TODO pullthis into a const CURSOR_RUNE
 				} else {
 					nstr += fmt.Sprintf("%c", r)
 				}
@@ -457,9 +477,27 @@ func fillBG(m model) []string {
 	return finStrs
 }
 
+/*
+TODO: rewrite to work more better and stuff
+drawWin :: [String] -> Window -> [String]
+drawWin wrkspc win
+drawWin should take a list of Strings representing the screen before, and a Window
+to be drawn on it.  Height is not needed as it's just len(wrkspc), width is not
+needed as I plan to not allow a window to move off screen to the left or right
+
+Note:
+	Window.top == line to render top border of window
+	Window.lines == how many lines to give the window
+	Window.left == column to render left border of window
+	Window.cols == number of columns to give the window
+sudocode of logit to implement:
+
+
+
+*/
 func drawWin (strs []string, w window) []string {
 	for i, v := range strs {
-		if i == w.top || i == w.top - 1 + w.lines {
+		if i == w.top || i == w.top - 1 + w.lines { // draw top and bottom borders
 			nstr := ""
 			for ii, _ := range v {
 				if ii == w.left || ii == w.left + w.cols - 1 {
@@ -472,13 +510,15 @@ func drawWin (strs []string, w window) []string {
 			}
 			strs[i] = nstr // v[:w.left] + "+" + strings.Repeat("-", w.cols-2) + "+" + v[w.left + w.cols:]
 		}
-		if i > w.top && i < w.top - 1 + w.lines {
+		if i > w.top && i < w.top - 1 + w.lines { // draw contents
 			nstr := ""
+			// ln := i - w.top - 1 // index of w.cont to render
 			for ii, _ := range v {
 				if ii == w.left || ii == w.left + w.cols - 1 {
 					nstr += "|" // TODO: extract into const, termLftRgtCorner
 				} else if ii > w.left && ii < w.left + w.cols - 1 {
-					nstr += " " // TODO: replace with w.cont
+					// rn := ii - w.left - 1 // index of rune to print
+					nstr += "😅" // string(w.cont[ln][rn])
 				} else {
 					nstr += fmt.Sprintf("%c", v[ii])
 				}

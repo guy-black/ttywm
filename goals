@@ -1,3 +1,9 @@
+-- make all the windows work as terminals
+  - figure out how to display stdout
+    -- just pull the text raw from the term and see what happnes and go from there
+  - figure out how to pass resize signals to it
+  - ifgure out how to pass stdin into it
+  - figure out how to handle exit sh command
 -- implement alt+tab window switcher
   - pop up modal shows all windows
   - able to change ws on the currently seleected window with alt+1-8
@@ -6,14 +12,6 @@
     -- ie if the window is on 01001000 but my ws is 00000111:
       should I change my workspace to 01000111, or to 00001111 or even 01001111 or
       should I change the windwo to 01001001 or 01001010 or 01001100 or 0100111 or what???
--- make all the windows work as terminals
-  - golang.org/x/term ???
-  - okay so the NewTerminal function takes a ReaderWriter and a string for prompt
-    - but other functions hint at a file description
-    - and everything is a file, including terminals
-    - and there is already a reader writer for files
-    - so I think I'm supposed to get a fd for a terminal
-    - set it into raw mode, and the pass it's readerwriter to newTerminal
 -- implement small qol fun
   - load and save list of windows
   - "wallpaper" selector and creator
