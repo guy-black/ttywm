@@ -1,9 +1,12 @@
 -- make all the windows work as terminals
   - figure out how to display stdout
-    -- just pull the text raw from the term and see what happnes and go from there
+    -- just pull the text raw from the term and see what happens and go from there
+      - first work out how to work in perfect scenario where entire window is in workspace
+      - then work out overlapping windows and partial or wholly offscreen windows
   - figure out how to pass resize signals to it
   - ifgure out how to pass stdin into it
   - figure out how to handle exit sh command
+-- make cursor rendering go off of column not string length
 -- implement alt+tab window switcher
   - pop up modal shows all windows
   - able to change ws on the currently seleected window with alt+1-8

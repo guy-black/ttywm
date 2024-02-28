@@ -6,7 +6,7 @@ import (
 	"os/exec"
 	"time"
 	"strings"
-	// "slices"
+	"slices"
 
 	// "github.com/charmbracelet/lipgloss"
 	tea "github.com/charmbracelet/bubbletea"
@@ -36,7 +36,7 @@ type model struct {
 type window struct {
 	id    uint // unique id
 	name  string // name
-	cont  [][] rune // contents
+	cont  []string // contents
 	onWS  byte // byte of workspaces it's visible on
 	top   int // index of top border
 	lines int // how many lines to give the window
@@ -98,6 +98,11 @@ func (m model) Init() tea.Cmd {
 	)
 }
 
+func isNewLine(c rune) bool {
+	return c == '\n' || c == '\r'
+}
+
+
 // ~~~~~~~
 // update
 // ~~~~~~~
@@ -106,6 +111,13 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 		case TickMsg:
 			m.dt = time.Now()
+			for i, w:=range m.windows {
+				buf:=make([]byte, 4096)
+				w.pty.Read(buf)
+				winConts := strings.FieldsFunc(string(buf), isNewLine)
+				m.windows[i].cont = winConts
+				buf = slices.Delete(buf, 0, 4096)
+			}
 			return m, doTick()
 		case tea.WindowSizeMsg:
 			m.width = msg.Width
@@ -143,21 +155,18 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					if err != nil {
 						return m, nil // TODO: handle this error more gracefully
 					}
-					txt := make ([]byte, 1024)
-					ptmx.Read(txt)
-					isNewLine := func(c rune) bool {
-						return c == '\n' || c == '\r'
-					}
-					winContStrs := strings.FieldsFunc(string(txt), isNewLine)
-					winConts := make([][]rune, 0)
-					for _, s := range (winContStrs) {
-						winConts = append (winConts, []rune(s))
-					}
+// 					txt := make ([]byte, 4096)
+// 					ptmx.Read(txt)
+// 					winConts := strings.FieldsFunc(string(txt), isNewLine)
+// 					winConts := make([][]rune, 0)
+// 					for _, s := range (winContStrs) {
+// 						winConts = append (winConts, []rune(s))
+// 					}
 					newWin :=
 						window {
 							id    : m.winCt,
 							name  : "",
-							cont  : winConts,
+							cont  : make([]string, 0),
 							onWS  : m.visWS,
 							top   : m.currY,
 							lines : 15, // TODO: pull this into a const DEFUALT_WINDOW_HEIGHT
@@ -479,11 +488,13 @@ func fillBG(m model) []string {
 
 /*
 TODO: rewrite to work more better and stuff
-drawWin :: [String] -> Window -> [String]
-drawWin wrkspc win
+drawWin :: [String] -> Window -> Int -> [String]
+drawWin wrkspc win wid
 drawWin should take a list of Strings representing the screen before, and a Window
 to be drawn on it.  Height is not needed as it's just len(wrkspc), width is not
-needed as I plan to not allow a window to move off screen to the left or right
+needed as I plan to not allow a window to move off screen to the left or right----
+-nvm that doesn't solve the problem of rendering one window on top of another so
+I should just deal with this problem instead of trying to avoid it
 
 Note:
 	Window.top == line to render top border of window
@@ -491,10 +502,37 @@ Note:
 	Window.left == column to render left border of window
 	Window.cols == number of columns to give the window
 sudocode of logit to implement:
-
-
-
+if win.top >= len(wrkspc) ||
+	 win.left >= wid ||
+	 win.top + win.lines + 1 < 0 ||
+	 win.left + win.cols + 1 < 0 then
+		 window is fully out of frame do not render
+else if
 */
+
+func drawWin (strs []string, w window) []string {
+	// draw top border
+	strs[w.top] = strs[w.top][:w.left] +
+		"╭" + strings.Repeat("─", w.cols) + "╮" +
+		strs[w.top][w.left+w.cols+2:]
+	// draw lines
+	for i:=0; i<w.lines; i++ {
+		// msg := fmt.Sprintf("there are %d lines of cont", len(w.cont))
+		msg := ""
+		if i < len(w.cont) {
+			msg = w.cont[i]
+		}
+		strs[w.top+i+1] = strs[w.top+i+1][:w.left] +
+			"│" + msg + "│" +// why is this doing the wrong thing is it stupid ??????
+			strs[w.top+i+1][w.left+w.cols+2:]
+	}
+	strs[w.top+w.lines+1] = strs[w.top+w.lines+1][:w.left] +
+		"╰" + strings.Repeat("─", w.cols) + "╯" +
+		strs[w.top+w.lines+1][w.left+w.cols+2:]
+	return strs
+}
+
+/*
 func drawWin (strs []string, w window) []string {
 	for i, v := range strs {
 		if i == w.top || i == w.top - 1 + w.lines { // draw top and bottom borders
@@ -518,7 +556,7 @@ func drawWin (strs []string, w window) []string {
 					nstr += "|" // TODO: extract into const, termLftRgtCorner
 				} else if ii > w.left && ii < w.left + w.cols - 1 {
 					// rn := ii - w.left - 1 // index of rune to print
-					nstr += "😅" // string(w.cont[ln][rn])
+					nstr += " " // string(w.cont[ln][rn])
 				} else {
 					nstr += fmt.Sprintf("%c", v[ii])
 				}
@@ -528,6 +566,7 @@ func drawWin (strs []string, w window) []string {
 	}
 	return strs
 }
+*/
 
 // ~~~~~
 // main
