@@ -3,6 +3,12 @@
     -- just pull the text raw from the term and see what happens and go from there
       - first work out how to work in perfect scenario where entire window is in workspace
       - then work out overlapping windows and partial or wholly offscreen windows
+    -- move the running of the wndow to it's own goroutine
+      - when the window is created start a goroutine that takes a
+        - buf *[]string
+        - kil *bool
+        - pty *file
+       - while the kil bool is still false, continuosly read from pty and use that to update the pointed to []string
   - figure out how to pass resize signals to it
   - ifgure out how to pass stdin into it
   - figure out how to handle exit sh command
@@ -27,3 +33,4 @@
   - allow for border on bgs
   - add more bgs
     - https://www.asciiart.eu/art-and-design/patterns
+

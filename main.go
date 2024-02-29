@@ -6,7 +6,9 @@ import (
 	"os/exec"
 	"time"
 	"strings"
-	"slices"
+	//"slices"
+	"bufio"
+	"io"
 
 	// "github.com/charmbracelet/lipgloss"
 	tea "github.com/charmbracelet/bubbletea"
@@ -39,11 +41,12 @@ type window struct {
 	cont  []string // contents
 	onWS  byte // byte of workspaces it's visible on
 	top   int // index of top border
-	lines int // how many lines to give the window
+	lines uint16 // how many lines to give the window
 	left  int // index of left border
-	cols  int // how many columns to give the whole window
+	cols  uint16 // how many columns to give the whole window
 	pty   *os.File // pointer to pty
 	cmd   *exec.Cmd // pointer to the running shell
+	kil   bool // set to true to kill the goroutine for this window
 }
 
 type action int
@@ -102,7 +105,6 @@ func isNewLine(c rune) bool {
 	return c == '\n' || c == '\r'
 }
 
-
 // ~~~~~~~
 // update
 // ~~~~~~~
@@ -111,13 +113,6 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 		case TickMsg:
 			m.dt = time.Now()
-			for i, w:=range m.windows {
-				buf:=make([]byte, 4096)
-				w.pty.Read(buf)
-				winConts := strings.FieldsFunc(string(buf), isNewLine)
-				m.windows[i].cont = winConts
-				buf = slices.Delete(buf, 0, 4096)
-			}
 			return m, doTick()
 		case tea.WindowSizeMsg:
 			m.width = msg.Width
@@ -146,37 +141,59 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					}
 					return m, nil
 				case "alt+enter":
-					wsz := pty.Winsize {
-						Rows : 15, // TODO: pull these numbers from
-						Cols : 65, // default window size consts
+					// create a pty.Winsize for the pty
+					wsz := pty.Winsize {  // TODO: pull this out into a const DEF_WSZ
+						Rows : 15,
+						Cols : 65,
 					}
+					// execute bash or whatever shell the user wants
 					c := exec.Command("/bin/bash") // TODO: move this to a const SHELL
-					ptmx, err := pty.StartWithSize(c, &wsz)
+					ptmx, err := pty.StartWithSize(c, &wsz) // initialize the pty
+					// if the pty doesn't initialize just stop here and don't make a window
 					if err != nil {
-						return m, nil // TODO: handle this error more gracefully
+						return m, nil // TODO: actually show the error if it comes up
 					}
-// 					txt := make ([]byte, 4096)
-// 					ptmx.Read(txt)
-// 					winConts := strings.FieldsFunc(string(txt), isNewLine)
-// 					winConts := make([][]rune, 0)
-// 					for _, s := range (winContStrs) {
-// 						winConts = append (winConts, []rune(s))
-// 					}
+					// create the new window
 					newWin :=
 						window {
 							id    : m.winCt,
 							name  : "",
-							cont  : make([]string, 0),
+							cont  : make([]string, 1), // make sure cont has atleast 1 line
 							onWS  : m.visWS,
 							top   : m.currY,
-							lines : 15, // TODO: pull this into a const DEFUALT_WINDOW_HEIGHT
+							lines : wsz.Rows,
 							left  : m.currX,
-							cols  : 65, // TODO: pull this into a const DEFUALT_WINDOW_WIDTH
+							cols  : wsz.Cols,
 							pty   : ptmx,
 							cmd   : c,
+							kil   : false,
 						}
-					m.winCt++
-					m.windows = append(m.windows, newWin)
+					m.winCt++ // inc winCt to make sure the next window made has a unique id
+					m.windows = append(m.windows, newWin) // add the window to the top of the stack
+					go func (w *window) { // start goroutine to read from the pty
+						reader := bufio.NewReader(w.pty) // not sure if this should be in or before goroutine
+						max_buffer := uint(w.lines) // TODO: move this into a const
+						for !w.kil { // only do this while kil is false
+							r, _, err := reader.ReadRune()
+							if err != nil {
+								if err == io.EOF { // I guess EOF would happen if the pty closes?
+									return // I think adding this may close the goroutine whenever
+									// the pty closes, if so I can remove the whole kil thing idk
+								}// if there's an error that's not pty I'll just append it to
+								// the window cont to show until I think of something better
+								w.cont = append (w.cont, fmt.Sprint(err))
+							}// if there is no error append r to the end of the last string in w.cont
+							w.cont[len(w.cont)-1] = w.cont[len(w.cont)-1] + string(r)
+							// if r is a newline, also add a new string to w.cont
+							if r == '\n' {
+								w.cont = append(w.cont, "")
+								if uint(len(w.cont)) > max_buffer {// if this new line puts len(w.cont) over max_buffer
+									w.cont = w.cont[1:] // pop off the first line
+								}
+							}
+						}
+						return // once kil is set to true, close this goroutine
+					} (&newWin)
 					return m, nil
 				case "alt+z": // lift window to top of stack
 					cw := getCurWinInd (m)
@@ -413,9 +430,9 @@ func getCurWinInd (m model) int {
 
 func currWin (x, y int, w window) bool {
 	return x >= w.left &&
-		x <= w.left - 1 + w.cols &&
+		x <= w.left - 1 + int(w.cols) &&
 		y >= w.top &&
-		y <= w.top - 1 + w.lines
+		y <= w.top - 1 + int(w.lines)
 }
 
 // ~~~~~
@@ -511,12 +528,14 @@ else if
 */
 
 func drawWin (strs []string, w window) []string {
+	intlines := int(w.lines) // for
+	intcols := int(w.cols) // convenience
 	// draw top border
 	strs[w.top] = strs[w.top][:w.left] +
-		"╭" + strings.Repeat("─", w.cols) + "╮" +
-		strs[w.top][w.left+w.cols+2:]
+		"╭" + strings.Repeat("─", int(intcols)) + "╮" +
+		strs[w.top][w.left+int(intcols)+2:]
 	// draw lines
-	for i:=0; i<w.lines; i++ {
+	for i:=0; i<intlines; i++ {
 		// msg := fmt.Sprintf("there are %d lines of cont", len(w.cont))
 		msg := ""
 		if i < len(w.cont) {
@@ -524,11 +543,11 @@ func drawWin (strs []string, w window) []string {
 		}
 		strs[w.top+i+1] = strs[w.top+i+1][:w.left] +
 			"│" + msg + "│" +// why is this doing the wrong thing is it stupid ??????
-			strs[w.top+i+1][w.left+w.cols+2:]
+			strs[w.top+i+1][w.left+intcols+2:]
 	}
-	strs[w.top+w.lines+1] = strs[w.top+w.lines+1][:w.left] +
-		"╰" + strings.Repeat("─", w.cols) + "╯" +
-		strs[w.top+w.lines+1][w.left+w.cols+2:]
+	strs[w.top+intlines+1] = strs[w.top+intlines+1][:w.left] +
+		"╰" + strings.Repeat("─", intcols) + "╯" +
+		strs[w.top+intlines+1][w.left+intcols+2:]
 	return strs
 }
 
