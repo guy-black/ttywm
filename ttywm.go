@@ -8,7 +8,7 @@ import (
 	"strings"
 	//"slices"
 	"bufio"
-	"io"
+	//"io"
 
 	// "github.com/charmbracelet/lipgloss"
 	tea "github.com/charmbracelet/bubbletea"
@@ -46,7 +46,7 @@ type window struct {
 	cols  uint16 // how many columns to give the whole window
 	pty   *os.File // pointer to pty
 	cmd   *exec.Cmd // pointer to the running shell
-	kil   bool // set to true to kill the goroutine for this window
+	msgch chan PtyMsg // channel for PtyMsg from this pty
 }
 
 type action int
@@ -85,6 +85,34 @@ func initialModel() model {
 	}
 }
 
+// msg for when to write a new rune to a window
+type PtyMsg struct {
+	id uint
+	rn rune
+}
+
+func listenForPtyMsg (wid uint, ch chan PtyMsg, pty *os.File) tea.Cmd {
+	return func() tea.Msg {
+		reader := bufio.NewReader(pty)
+		for {
+			r, _, err := reader.ReadRune()
+			if err == nil { // TODO: actually deal with an error
+				pmsg := PtyMsg {
+					id: wid,
+					rn: r,
+				}
+				ch <- pmsg
+			}
+		}
+	}
+}
+
+func waitForPtyMsg (ch chan PtyMsg) tea.Cmd {
+	return func() tea.Msg {
+		return <- ch
+	}
+}
+
 type TickMsg time.Time
 
 func doTick() tea.Cmd {
@@ -114,6 +142,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case TickMsg:
 			m.dt = time.Now()
 			return m, doTick()
+		case PtyMsg: //
 		case tea.WindowSizeMsg:
 			m.width = msg.Width
 			m.height = msg.Height
@@ -153,12 +182,14 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					if err != nil {
 						return m, nil // TODO: actually show the error if it comes up
 					}
+					// make the channel that the PtyMsg for this pty will go through
+					ch := make (chan PtyMsg)
 					// create the new window
 					newWin :=
 						window {
 							id    : m.winCt,
 							name  : "",
-							cont  : make([]string, 1), // make sure cont has atleast 1 line
+							cont  : []string {"testString"},//make([]string, 1), // make sure cont has atleast 1 line
 							onWS  : m.visWS,
 							top   : m.currY,
 							lines : wsz.Rows,
@@ -166,35 +197,38 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 							cols  : wsz.Cols,
 							pty   : ptmx,
 							cmd   : c,
-							kil   : false,
+							msgch : ch,
 						}
 					m.winCt++ // inc winCt to make sure the next window made has a unique id
 					m.windows = append(m.windows, newWin) // add the window to the top of the stack
-					go func (w *window) { // start goroutine to read from the pty
-						reader := bufio.NewReader(w.pty) // not sure if this should be in or before goroutine
-						max_buffer := uint(w.lines) // TODO: move this into a const
-						for !w.kil { // only do this while kil is false
-							r, _, err := reader.ReadRune()
-							if err != nil {
-								if err == io.EOF { // I guess EOF would happen if the pty closes?
-									return // I think adding this may close the goroutine whenever
-									// the pty closes, if so I can remove the whole kil thing idk
-								}// if there's an error that's not pty I'll just append it to
-								// the window cont to show until I think of something better
-								w.cont = append (w.cont, fmt.Sprint(err))
-							}// if there is no error append r to the end of the last string in w.cont
-							w.cont[len(w.cont)-1] = w.cont[len(w.cont)-1] + string(r)
-							// if r is a newline, also add a new string to w.cont
-							if r == '\n' {
-								w.cont = append(w.cont, "")
-								if uint(len(w.cont)) > max_buffer {// if this new line puts len(w.cont) over max_buffer
-									w.cont = w.cont[1:] // pop off the first line
-								}
-							}
-						}
-						return // once kil is set to true, close this goroutine
-					} (&newWin)
-					return m, nil
+// 					go func (w *window) { // start goroutine to read from the pty
+// 						reader := bufio.NewReader(w.pty) // not sure if this should be in or before goroutine
+// 						max_buffer := uint(w.lines) // TODO: move this into a const
+// 						for !w.kil { // only do this while kil is false
+// 							r, _, err := reader.ReadRune()
+// 							if err != nil {
+// 								if err == io.EOF { // I guess EOF would happen if the pty closes?
+// 									return // I think adding this may close the goroutine whenever
+// 									// the pty closes, if so I can remove the whole kil thing idk
+// 								}// if there's an error that's not pty I'll just append it to
+// 								// the window cont to show until I think of something better
+// 								w.cont = append (w.cont, fmt.Sprint(err))
+// 							}// if there is no error append r to the end of the last string in w.cont
+// 							w.cont[len(w.cont)-1] = w.cont[len(w.cont)-1] + string(r)
+// 							// if r is a newline, also add a new string to w.cont
+// 							if r == '\n' {
+// 								w.cont = append(w.cont, "")
+// 								if uint(len(w.cont)) > max_buffer {// if this new line puts len(w.cont) over max_buffer
+// 									w.cont = w.cont[1:] // pop off the first line
+// 								}
+// 							}
+// 						}
+// 						return // once kil is set to true, close this goroutine
+// 					} (&newWin)
+					return m, tea.Batch (
+						listenForPtyMsg (newWin.id, ch, newWin.pty),
+						waitForPtyMsg (ch),
+					)
 				case "alt+z": // lift window to top of stack
 					cw := getCurWinInd (m)
 					if cw >= 0 && cw < len(m.windows) -1 {
@@ -540,6 +574,9 @@ func drawWin (strs []string, w window) []string {
 		msg := ""
 		if i < len(w.cont) {
 			msg = w.cont[i]
+		}
+		if lnmsg := len(msg); lnmsg < intcols {
+			msg += strings.Repeat(" ", intcols - lnmsg)
 		}
 		strs[w.top+i+1] = strs[w.top+i+1][:w.left] +
 			"│" + msg + "│" +// why is this doing the wrong thing is it stupid ??????
