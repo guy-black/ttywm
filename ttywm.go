@@ -140,9 +140,10 @@ func isNewLine(c rune) bool {
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 		case TickMsg:
-			m.dt = time.Now()
+			m.dt = time.Time(msg)
 			return m, doTick()
-		case PtyMsg: //
+		case PtyMsg:
+
 		case tea.WindowSizeMsg:
 			m.width = msg.Width
 			m.height = msg.Height
@@ -189,7 +190,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						window {
 							id    : m.winCt,
 							name  : "",
-							cont  : []string {"testString"},//make([]string, 1), // make sure cont has atleast 1 line
+							cont  : make([]string, 1), // make sure cont has atleast 1 line
 							onWS  : m.visWS,
 							top   : m.currY,
 							lines : wsz.Rows,
