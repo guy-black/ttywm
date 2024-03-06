@@ -9,6 +9,7 @@ import (
 	//"slices"
 	"bufio"
 	//"io"
+	"unicode"
 
 	// "github.com/charmbracelet/lipgloss"
 	tea "github.com/charmbracelet/bubbletea"
@@ -143,7 +144,18 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.dt = time.Time(msg)
 			return m, doTick()
 		case PtyMsg:
-
+			var ch chan PtyMsg
+			for i, w := range m.windows {
+				if w.id == msg.id { // look for the correct window to update
+					if msg.rn == '\n' { // if the rune is a newline
+						m.windows[i].cont = append(w.cont, "") // add a new line to the window's cont
+					} else {
+						w.cont[len(w.cont)-1] += string(msg.rn) // add the rn to the last string in window's cont
+					}
+					ch = w.msgch
+				}
+			}
+			return m, waitForPtyMsg(ch)
 		case tea.WindowSizeMsg:
 			m.width = msg.Width
 			m.height = msg.Height
@@ -173,7 +185,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				case "alt+enter":
 					// create a pty.Winsize for the pty
 					wsz := pty.Winsize {  // TODO: pull this out into a const DEF_WSZ
-						Rows : 15,
+						Rows : 16,
 						Cols : 65,
 					}
 					// execute bash or whatever shell the user wants
@@ -190,7 +202,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						window {
 							id    : m.winCt,
 							name  : "",
-							cont  : make([]string, 1), // make sure cont has atleast 1 line
+							cont  : []string {""}, // make sure cont has atleast 1 line
 							onWS  : m.visWS,
 							top   : m.currY,
 							lines : wsz.Rows,
@@ -570,12 +582,34 @@ func drawWin (strs []string, w window) []string {
 		"╭" + strings.Repeat("─", int(intcols)) + "╮" +
 		strs[w.top][w.left+int(intcols)+2:]
 	// draw lines
+	ltc := 14
 	for i:=0; i<intlines; i++ {
-		// msg := fmt.Sprintf("there are %d lines of cont", len(w.cont))
+		//msg := fmt.Sprintf("there are %d lines of cont of len %d", len(w.cont), len(w.cont[0]))
 		msg := ""
-		if i < len(w.cont) {
-			msg = w.cont[i]
+		if ltc < len(w.cont){
+			lir := []rune(w.cont[ltc])
+			switch i {
+				case 0: msg = "checking line " + fmt.Sprint(ltc)
+				case 1: msg = w.cont[ltc]
+				case 2: msg = "length in bytes: " + fmt.Sprint(len(w.cont[ltc]))
+				case 3: msg = "length in runes: "+ fmt.Sprint(len(lir))
+				case 4: msg = "number of graphic: "+ fmt.Sprint(countRunesAre(lir, unicode.IsGraphic))
+				case 5: msg = "number of print: "+ fmt.Sprint(countRunesAre(lir, unicode.IsPrint))
+				case 6: msg = "number of control: "+ fmt.Sprint(countRunesAre(lir, unicode.IsControl))
+				case 7: msg = "number of control ext: "+ fmt.Sprint(countRunesAre(lir, altIsControl))
+				case 8: msg = "number of control format: "+ fmt.Sprint(countRunesAre(lir, isControlFmt))
+				case 9: msg = "number of letters: "+ fmt.Sprint(countRunesAre(lir, unicode.IsLetter))
+				case 10: msg = "number of digits: "+ fmt.Sprint(countRunesAre(lir, unicode.IsDigit))
+				case 11: msg = "number of punctuation: "+ fmt.Sprint(countRunesAre(lir, unicode.IsPunct))
+				case 12: msg = "number of space: "+ fmt.Sprint(countRunesAre(lir, unicode.IsSpace))
+				case 13: msg = "number of symbol: "+ fmt.Sprint(countRunesAre(lir, unicode.IsSymbol))
+				case 14: msg = "number of number: "+ fmt.Sprint(countRunesAre(lir, unicode.IsNumber))
+			}
 		}
+// 		if i < len(w.cont) {
+// 			// msg = w.cont[i]
+// 			msg = fmt.Sprintf("%d", len([]rune(w.cont[i])))
+// 		}
 		if lnmsg := len(msg); lnmsg < intcols {
 			msg += strings.Repeat(" ", intcols - lnmsg)
 		}
@@ -587,6 +621,23 @@ func drawWin (strs []string, w window) []string {
 		"╰" + strings.Repeat("─", intcols) + "╯" +
 		strs[w.top+intlines+1][w.left+intcols+2:]
 	return strs
+}
+
+func countRunesAre (rs []rune, fn func (rune) bool) int {
+	counter := 0
+	for _, r := range rs {
+		if fn (r){
+			counter++
+		}
+	}
+	return counter
+}
+
+func altIsControl (r rune) bool {
+	return unicode.Is(unicode.C, r)
+}
+func isControlFmt (r rune) bool {
+	return unicode.Is(unicode.Cf, r)
 }
 
 /*
